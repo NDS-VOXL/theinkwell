@@ -29,12 +29,21 @@ jobs:
         run: |
           echo "Checking filename casing, invalid characters, and duplicates..."
           
-          # Find all JS/TS files
-          files=$(find . -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \))
+          # Find all JS/TS files EXCEPT node_modules and other build directories
+          files=$(find . -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./.next/*" \
+            -not -path "./dist/*" \
+            -not -path "./build/*")
           error_found=0
 
           for file in $files; do
             filename=$(basename "$file")
+            
+            # Skip node_modules entirely (additional safety)
+            if [[ "$file" == *"node_modules"* ]]; then
+              continue
+            fi
             
             # Check for spaces or special characters
             if [[ "$filename" =~ [^a-zA-Z0-9._-] ]]; then
@@ -43,20 +52,25 @@ jobs:
             fi
 
             # PascalCase for components
-            if [[ "$file" =~ components/ ]] && [[ ! "$filename" =~ ^[A-Z][a-zA-Z0-9]+\. ]]; then
+            if [[ "$file" =~ components/ ]] && [[ ! "$filename" =~ ^[A-Z][a-zA-Z0-9]*\. ]]; then
               echo "❌ Component file not PascalCase: $file"
               error_found=1
             fi
 
             # camelCase for utils
-            if [[ "$file" =~ utils/ ]] && [[ ! "$filename" =~ ^[a-z][a-zA-Z0-9]+\. ]]; then
+            if [[ "$file" =~ utils/ ]] && [[ ! "$filename" =~ ^[a-z][a-zA-Z0-9]*\. ]]; then
               echo "❌ Utility file not camelCase: $file"
               error_found=1
             fi
           done
 
-          # Check for duplicate filenames (case-insensitive)
-          duplicates=$(find . -type f -printf '%f\n' | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
+          # Check for duplicate filenames (case-insensitive) EXCLUDING common directories
+          duplicates=$(find . -type f \
+            -not -path "./node_modules/*" \
+            -not -path "./.next/*" \
+            -not -path "./dist/*" \
+            -not -path "./build/*" \
+            -printf '%f\n' | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
           if [ ! -z "$duplicates" ]; then
             echo "❌ Duplicate filenames detected (case-insensitive):"
             echo "$duplicates"
