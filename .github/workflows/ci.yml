@@ -1,0 +1,69 @@
+name: Next.js CI
+
+on:
+  push:
+    branches: ["dev", "main"]
+  pull_request:
+    branches: ["dev", "main"]
+
+jobs:
+  run-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      # Filename & Structure Gate
+      - name: Check File Naming
+        run: |
+          echo "Checking filename casing and duplicates..."
+          invalid=$(find . -type f \( -name "*[A-Z]*.js" -o -name "*[A-Z]*.jsx" -o -name "*[A-Z]*.ts" -o -name "*[A-Z]*.tsx" \) | grep -v "components")
+          if [ ! -z "$invalid" ]; then
+            echo "❌ Invalid filename casing detected:"
+            echo "$invalid"
+            exit 1
+          fi
+          duplicates=$(find . -type f -printf '%f\n' | sort | uniq -d)
+          if [ ! -z "$duplicates" ]; then
+            echo "❌ Duplicate filenames found:"
+            echo "$duplicates"
+            exit 1
+          fi
+          echo "✓ Filename check passed"
+
+      # Lint Gate
+      - name: Run ESLint
+        run: npm run lint
+
+      # TypeScript Gate
+      - name: TypeScript Type Check
+        run: npm run type-check
+
+      # Build Gate
+      - name: Build Next.js Project
+        run: npm run build
+
+      # Security Gate
+      - name: Security Audit (Strict)
+        run: |
+          echo "Running dependency security check..."
+          npm audit --production
+
+      # Merge Gate Summary
+      - name: CI Status Summary
+        run: |
+          echo "----------------------------------------"
+          echo "✅ All CI checks passed! Merge allowed."
+          echo "CI gates cleared: Filename | Lint | TypeScript | Build | Security"
+          echo "GitHub branch protection ensures PR cannot merge if CI fails."
+          echo "----------------------------------------"
