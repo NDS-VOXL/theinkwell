@@ -1,0 +1,121 @@
+name: Next.js CI
+
+on:
+  push:
+    branches: ["dev", "main"]
+  pull_request:
+    branches: ["dev", "main"]
+
+jobs:
+  run-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ────────────── Checkout & Setup ──────────────
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"  # Changed to match your local version
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      # ────────────── Filename & Structure Gate (Strict) ──────────────
+      - name: Check File Naming (Strict)
+        run: |
+          echo "Checking filename casing, invalid characters, and duplicates..."
+          
+          # Find all JS/TS files EXCEPT node_modules and other build directories
+          files=$(find . -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./.next/*" \
+            -not -path "./dist/*" \
+            -not -path "./build/*")
+          error_found=0
+
+          for file in $files; do
+            filename=$(basename "$file")
+            
+            # Skip node_modules entirely (additional safety)
+            if [[ "$file" == *"node_modules"* ]]; then
+              continue
+            fi
+            
+            # Check for spaces or special characters
+            if [[ "$filename" =~ [^a-zA-Z0-9._-] ]]; then
+              echo "❌ Invalid characters in file: $file"
+              error_found=1
+            fi
+
+            # PascalCase for components
+            if [[ "$file" =~ components/ ]] && [[ ! "$filename" =~ ^[A-Z][a-zA-Z0-9]*\. ]]; then
+              echo "❌ Component file not PascalCase: $file"
+              error_found=1
+            fi
+
+            # camelCase for utils
+            if [[ "$file" =~ utils/ ]] && [[ ! "$filename" =~ ^[a-z][a-zA-Z0-9]*\. ]]; then
+              echo "❌ Utility file not camelCase: $file"
+              error_found=1
+            fi
+          done
+
+          # Check for duplicate filenames WITHIN THE SAME DIRECTORY (case-insensitive)
+          echo "Checking for duplicate filenames in the same directory..."
+          duplicates_found=0
+          while IFS= read -r dir; do
+            # Skip node_modules and build directories
+            if [[ "$dir" == *"node_modules"* ]] || [[ "$dir" == *".next"* ]] || [[ "$dir" == *"dist"* ]] || [[ "$dir" == *"build"* ]]; then
+              continue
+            fi
+            
+            # Check for duplicates in this specific directory
+            dir_duplicates=$(find "$dir" -maxdepth 1 -type f -printf '%f\n' | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
+            if [ ! -z "$dir_duplicates" ]; then
+              echo "❌ Duplicate filenames in directory '$dir':"
+              echo "$dir_duplicates"
+              duplicates_found=1
+            fi
+          done < <(find . -type d -not -path "./node_modules/*" -not -path "./.next/*" -not -path "./dist/*" -not -path "./build/*")
+
+          if [ $duplicates_found -eq 1 ]; then
+            error_found=1
+          fi
+
+          if [ $error_found -eq 1 ]; then
+            echo "❌ Filename check failed!"
+            exit 1
+          fi
+
+          echo "✓ Filename check passed"
+
+      # ────────────── Lint Gate ──────────────
+      - name: Run ESLint
+        run: npm run lint
+
+      # ────────────── TypeScript Gate ──────────────
+      - name: TypeScript Type Check
+        run: npm run type-check
+
+      # ────────────── Build Gate ──────────────
+      - name: Build Next.js Project
+        run: npm run build
+
+      # ────────────── Security Gate ──────────────
+      - name: Security Audit (Strict)
+        run: |
+          echo "Running dependency security check..."
+          npm audit --production
+
+      # ────────────── Merge Gate Summary ──────────────
+      - name: CI Status Summary
+        run: |
+          echo "----------------------------------------"
+          echo "✅ All CI checks passed! Merge allowed."
+          echo "CI gates cleared: Filename | Lint | TypeScript | Build | Security"
+          echo "GitHub branch protection ensures PR cannot merge if CI fails."
+          echo "----------------------------------------"
