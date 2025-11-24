@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ────────────── Checkout & Setup ──────────────
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -23,43 +24,71 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      # Filename & Structure Gate
-      - name: Check File Naming
+      # ────────────── Filename & Structure Gate (Strict) ──────────────
+      - name: Check File Naming (Strict)
         run: |
-          echo "Checking filename casing and duplicates..."
-          invalid=$(find . -type f \( -name "*[A-Z]*.js" -o -name "*[A-Z]*.jsx" -o -name "*[A-Z]*.ts" -o -name "*[A-Z]*.tsx" \) | grep -v "components")
-          if [ ! -z "$invalid" ]; then
-            echo "❌ Invalid filename casing detected:"
-            echo "$invalid"
-            exit 1
-          fi
-          duplicates=$(find . -type f -printf '%f\n' | sort | uniq -d)
+          echo "Checking filename casing, invalid characters, and duplicates..."
+          
+          # Find all JS/TS files
+          files=$(find . -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \))
+          error_found=0
+
+          for file in $files; do
+            filename=$(basename "$file")
+            
+            # Check for spaces or special characters
+            if [[ "$filename" =~ [^a-zA-Z0-9._-] ]]; then
+              echo "❌ Invalid characters in file: $file"
+              error_found=1
+            fi
+
+            # PascalCase for components
+            if [[ "$file" =~ components/ ]] && [[ ! "$filename" =~ ^[A-Z][a-zA-Z0-9]+\. ]]; then
+              echo "❌ Component file not PascalCase: $file"
+              error_found=1
+            fi
+
+            # camelCase for utils
+            if [[ "$file" =~ utils/ ]] && [[ ! "$filename" =~ ^[a-z][a-zA-Z0-9]+\. ]]; then
+              echo "❌ Utility file not camelCase: $file"
+              error_found=1
+            fi
+          done
+
+          # Check for duplicate filenames (case-insensitive)
+          duplicates=$(find . -type f -printf '%f\n' | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
           if [ ! -z "$duplicates" ]; then
-            echo "❌ Duplicate filenames found:"
+            echo "❌ Duplicate filenames detected (case-insensitive):"
             echo "$duplicates"
+            error_found=1
+          fi
+
+          if [ $error_found -eq 1 ]; then
+            echo "❌ Filename check failed!"
             exit 1
           fi
+
           echo "✓ Filename check passed"
 
-      # Lint Gate
+      # ────────────── Lint Gate ──────────────
       - name: Run ESLint
         run: npm run lint
 
-      # TypeScript Gate
+      # ────────────── TypeScript Gate ──────────────
       - name: TypeScript Type Check
         run: npm run type-check
 
-      # Build Gate
+      # ────────────── Build Gate ──────────────
       - name: Build Next.js Project
         run: npm run build
 
-      # Security Gate
+      # ────────────── Security Gate ──────────────
       - name: Security Audit (Strict)
         run: |
           echo "Running dependency security check..."
           npm audit --production
 
-      # Merge Gate Summary
+      # ────────────── Merge Gate Summary ──────────────
       - name: CI Status Summary
         run: |
           echo "----------------------------------------"
