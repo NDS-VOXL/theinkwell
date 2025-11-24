@@ -64,16 +64,25 @@ jobs:
             fi
           done
 
-          # Check for duplicate filenames (case-insensitive) EXCLUDING common directories
-          duplicates=$(find . -type f \
-            -not -path "./node_modules/*" \
-            -not -path "./.next/*" \
-            -not -path "./dist/*" \
-            -not -path "./build/*" \
-            -printf '%f\n' | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
-          if [ ! -z "$duplicates" ]; then
-            echo "❌ Duplicate filenames detected (case-insensitive):"
-            echo "$duplicates"
+          # Check for duplicate filenames WITHIN THE SAME DIRECTORY (case-insensitive)
+          echo "Checking for duplicate filenames in the same directory..."
+          duplicates_found=0
+          while IFS= read -r dir; do
+            # Skip node_modules and build directories
+            if [[ "$dir" == *"node_modules"* ]] || [[ "$dir" == *".next"* ]] || [[ "$dir" == *"dist"* ]] || [[ "$dir" == *"build"* ]]; then
+              continue
+            fi
+            
+            # Check for duplicates in this specific directory
+            dir_duplicates=$(find "$dir" -maxdepth 1 -type f -printf '%f\n' | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
+            if [ ! -z "$dir_duplicates" ]; then
+              echo "❌ Duplicate filenames in directory '$dir':"
+              echo "$dir_duplicates"
+              duplicates_found=1
+            fi
+          done < <(find . -type d -not -path "./node_modules/*" -not -path "./.next/*" -not -path "./dist/*" -not -path "./build/*")
+
+          if [ $duplicates_found -eq 1 ]; then
             error_found=1
           fi
 
