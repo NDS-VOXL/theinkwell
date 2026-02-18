@@ -1,10 +1,43 @@
-/* globals.css */
+@import url('https://fonts.googleapis.com/css2?family=Inknut+Antiqua:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Merriweather+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 @import "tailwindcss";
+
 :root {
-  --color-surface: 211 211 211; 
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
-body{
-  background-color: lightgray;
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+html{
+  font-size: 15px;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  margin: 0;
+}
+
+.inknut-antiqua {
+  font-family: "Inknut Antiqua", serif;
+}
+
+.merri {
+  font-family: "Merriweather Sans", sans-serif;
+}
+

@@ -1,42 +1,10 @@
-"use client";
+import SideNav from "@/app/components/SideNav";
+import TopHeader from "@/app/components/TopHeader";
+import RightSidebar from "@/app/components/RightSidebar";
+import CreatePost from "@/app/components/CreatePost";
+import ArticleCard from "@/app/components/ArticleCard";
 
-import { useState } from "react";
-import SplashScreen from "./components/SplashScreen";
-import AuthScreen from "./components/AuthScreen";
-import SideNav from "./components/SideNav"; // Import SideNav here
-import TopHeader from './components/TopHeader';
-import RightSidebar from './components/RightSidebar';
-import CreatePost from './components/CreatePost';
-import ArticleCard from './components/ArticleCard';
-
-export default function Home() {
-  const [showSplash, setShowSplash] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-
-  const handleSplashComplete = () => setShowSplash(false);
-  
-  const handleLogin = () => setIsAuthenticated(true);
-  const handleRegister = () => setIsAuthenticated(true);
-
-  // 1. SPLASH STATE
-  if (showSplash) {
-    return <SplashScreen onComplete={handleSplashComplete} />;
-  }
-
-  // 2. AUTH STATE (No SideNav here)
-  if (!isAuthenticated) {
-    return (
-      <AuthScreen 
-        mode={authMode} 
-        onModeChange={setAuthMode} 
-        onLogin={handleLogin} 
-        onRegister={handleRegister} 
-      />
-    );
-  }
-
-  // 3. BLOG STATE (SideNav included, CSS structure fixed)
+export default function FeedPage() {
   return (
     // overflow-hidden on the parent prevents the "outer" scrollbar
     <div className="flex h-screen w-full overflow-hidden bg-[#F8F9FA]">
@@ -72,5 +40,4 @@ export default function Home() {
 
     </div>
   );
-
 }
