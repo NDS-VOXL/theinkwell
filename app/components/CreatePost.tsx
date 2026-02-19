@@ -4,10 +4,10 @@
 import { Image as ImageIcon } from 'lucide-react'; // Renamed to avoid conflict with next/image
 import Image from 'next/image';
 
+
 export default function CreatePost() {
   return (
     <div className="w-full bg-[#FDFBF7] rounded-[30px] p-4 mb-8 flex items-center gap-4 shadow-sm">
-      
       {/* User Avatar */}
       <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-200 shrink-0">
         <Image 
