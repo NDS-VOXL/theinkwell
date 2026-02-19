@@ -56,6 +56,7 @@ export default function Home() {
             
             {/* Center Feed: min-w-0 is vital to prevent flex-children from expanding */}
             <div className="flex-1 min-w-0">
+          
                <CreatePost />
                <h2 className="text-lg font-bold mb-6 text-gray-900 font-lato">Article feed</h2>
                <ArticleCard />
