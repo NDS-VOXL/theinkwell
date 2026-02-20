@@ -2,6 +2,7 @@
 
 import SideNav from '../components/SideNav';
 import TopHeader from '../components/TopHeader';
+import { useRouter } from 'next/navigation'; // 🟢 1. Import useRouter
 import { 
   UploadCloud, Save, Send, Link as LinkIcon, Folder, Type, 
   Bold, Italic, Underline, List as ListIcon, ListOrdered, Heading1,
@@ -11,6 +12,14 @@ import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 
 export default function CreateArticlePage() {
+  const router = useRouter(); // 🟢 2. Initialize the router
+
+  // 🟢 3. Define the logout logic
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn'); // Clear the session
+    router.push('/'); // Send them back to the landing/login page
+  };
+
   // Form States
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -33,14 +42,9 @@ export default function CreateArticlePage() {
   // --- SUBMIT LOGIC ---
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
-    // Simulate API delay (e.g., 2 seconds)
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    
     setIsSubmitting(false);
     setShowToast(true);
-
-    // Auto-hide notification after 4 seconds
     setTimeout(() => setShowToast(false), 4000);
   };
 
@@ -98,7 +102,6 @@ export default function CreateArticlePage() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#F8F9FA] relative">
       
-      {/* 🟢 SUCCESS TOAST */}
       {showToast && (
         <div className="fixed top-6 right-6 z-[100] flex items-center gap-4 bg-white border border-gray-100 shadow-[0_10px_40px_rgba(0,0,0,0.08)] p-4 rounded-2xl animate-in slide-in-from-right-10 duration-500 ease-out">
           <div className="flex items-center justify-center w-10 h-10 bg-teal-50 rounded-full">
@@ -114,7 +117,8 @@ export default function CreateArticlePage() {
         </div>
       )}
 
-      <SideNav />
+      {/* 🟢 4. Pass the handleLogout prop here */}
+      <SideNav onLogout={handleLogout} />
 
       <main className="flex-1 overflow-y-auto overflow-x-hidden bg-surface">
         <div className="w-full max-w-[1400px] mx-auto px-6 md:px-10 py-6 pb-20 relative">
@@ -125,7 +129,6 @@ export default function CreateArticlePage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
               
               <div className="lg:col-span-2 flex flex-col gap-6">
-                {/* Title Input */}
                 <div className="flex flex-col">
                   <label className={labelStyle}>Title</label>
                   <div className={containerStyle}>
@@ -134,7 +137,6 @@ export default function CreateArticlePage() {
                   </div>
                 </div>
 
-                {/* Article Preview Box */}
                 <div className="flex flex-col h-full">
                   <label className={labelStyle}>Article</label>
                   <div 
@@ -149,7 +151,6 @@ export default function CreateArticlePage() {
                   </div>
                 </div>
 
-                {/* Category & Links */}
                 <div className="flex flex-col">
                   <label className={labelStyle}>Category</label>
                   <div className={containerStyle}>
@@ -170,7 +171,6 @@ export default function CreateArticlePage() {
                   </div>
                 </div>
 
-                {/* ACTION BUTTONS */}
                 <div className="flex items-center gap-4 mt-2">
                   <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full border border-gray-400 text-gray-600 font-bold text-[14px] hover:bg-gray-50 transition-all font-lato">
                     <Save size={18} />Save to Drafts
@@ -190,7 +190,6 @@ export default function CreateArticlePage() {
                 </div>
               </div>
 
-              {/* Upload Section */}
               <div className="lg:col-span-1">
                  <div className="sticky top-10 w-full bg-[#FDFBF7] border-2 border-dashed border-gray-300 rounded-[10px] cursor-pointer hover:border-[#00897B] transition-all flex flex-col items-center justify-center h-[273px] gap-10">
                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-gray-400 group-hover:text-[#00897B] transition-colors">
@@ -207,7 +206,6 @@ export default function CreateArticlePage() {
         </div>
       </main>
 
-      {/* MODAL & EDITOR */}
       {isEditorOpen && (
         <div onClick={handleBackdropClick} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70 animate-in fade-in duration-200">
           <div 
@@ -242,7 +240,6 @@ export default function CreateArticlePage() {
             </div>
           </div>
 
-          {/* TOOL BAR */}
           <div ref={toolbarRef} className="mt-4 animate-in slide-in-from-bottom-5 duration-300" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#1A1A1A] rounded-2xl px-4 py-2 flex items-center gap-2 shadow-2xl border border-white/10">
                 <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleCommand('formatBlock', activeStyles.h1 ? 'p' : 'h1')}
