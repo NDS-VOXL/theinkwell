@@ -1,21 +1,27 @@
 'use client';
 
-import SideNav from '../components/SideNav'; // 1. Import SideNav
+import SideNav from '../components/SideNav';
 import TopHeader from '../components/TopHeader';
 import { 
   UploadCloud, Save, Send, Link as LinkIcon, Folder, Type, 
-  Bold, Italic, Underline, List as ListIcon, ListOrdered, Heading1 
+  Bold, Italic, Underline, List as ListIcon, ListOrdered, Heading1,
+  Loader2, CheckCircle, X 
 } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 
 export default function CreateArticlePage() {
+  // Form States
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [link, setLink] = useState('');
   const [content, setContent] = useState(''); 
   
+  // UI States
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
   const editorRef = useRef<HTMLDivElement>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -24,7 +30,21 @@ export default function CreateArticlePage() {
     bold: false, italic: false, underline: false, h1: false, ol: false, ul: false
   });
 
-  // --- EDITOR LOGIC (Keep existing syncState, handleCommand, etc.) ---
+  // --- SUBMIT LOGIC ---
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    
+    // Simulate API delay (e.g., 2 seconds)
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    
+    setIsSubmitting(false);
+    setShowToast(true);
+
+    // Auto-hide notification after 4 seconds
+    setTimeout(() => setShowToast(false), 4000);
+  };
+
+  // --- EDITOR LOGIC ---
   const syncState = () => {
     if (typeof document === 'undefined') return;
     const formatBlock = document.queryCommandValue('formatBlock').toLowerCase();
@@ -76,13 +96,26 @@ export default function CreateArticlePage() {
   const inputStyle = "flex-1 bg-transparent outline-none text-gray-800 font-lato font-light text-[12px] leading-none placeholder-gray-400";
 
   return (
-    // 2. Added Flex Wrapper to include SideNav
-    <div className="flex h-screen w-full overflow-hidden bg-[#F8F9FA]">
+    <div className="flex h-screen w-full overflow-hidden bg-[#F8F9FA] relative">
       
-      {/* 3. Render the SideNav */}
+      {/* 🟢 SUCCESS TOAST */}
+      {showToast && (
+        <div className="fixed top-6 right-6 z-[100] flex items-center gap-4 bg-white border border-gray-100 shadow-[0_10px_40px_rgba(0,0,0,0.08)] p-4 rounded-2xl animate-in slide-in-from-right-10 duration-500 ease-out">
+          <div className="flex items-center justify-center w-10 h-10 bg-teal-50 rounded-full">
+            <CheckCircle className="text-[#00897B]" size={20} />
+          </div>
+          <div className="pr-4">
+            <p className="font-bold text-gray-900 text-sm font-lato">Success!</p>
+            <p className="text-gray-500 text-xs font-lato">Your blog has been published.</p>
+          </div>
+          <button onClick={() => setShowToast(false)} className="text-gray-300 hover:text-gray-500 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <SideNav />
 
-      {/* 4. Main Scrollable Area */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden bg-surface">
         <div className="w-full max-w-[1400px] mx-auto px-6 md:px-10 py-6 pb-20 relative">
           <TopHeader />
@@ -137,16 +170,32 @@ export default function CreateArticlePage() {
                   </div>
                 </div>
 
+                {/* ACTION BUTTONS */}
                 <div className="flex items-center gap-4 mt-2">
-                  <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full border border-gray-400 text-gray-600 font-bold text-[14px] hover:bg-gray-50 transition-all font-lato"><Save size={18} />Save to Drafts</button>
-                  <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full bg-[#00897B] text-white font-bold text-[14px] hover:bg-teal-800 transition-all font-lato">Submit to Publish <Send size={16} /></button>
+                  <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full border border-gray-400 text-gray-600 font-bold text-[14px] hover:bg-gray-50 transition-all font-lato">
+                    <Save size={18} />Save to Drafts
+                  </button>
+                  
+                  <button 
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full bg-[#00897B] text-white font-bold text-[14px] hover:bg-teal-800 transition-all font-lato disabled:opacity-80 disabled:cursor-not-allowed min-w-[180px] min-h-[52px]"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 size={20} className="animate-spin text-white" />
+                    ) : (
+                      <>Submit to Publish <Send size={16} /></>
+                    )}
+                  </button>
                 </div>
               </div>
 
               {/* Upload Section */}
               <div className="lg:col-span-1">
                  <div className="sticky top-10 w-full bg-[#FDFBF7] border-2 border-dashed border-gray-300 rounded-[10px] cursor-pointer hover:border-[#00897B] transition-all flex flex-col items-center justify-center h-[273px] gap-10">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-gray-400 group-hover:text-[#00897B] transition-colors"><UploadCloud size={32} /></div>
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-gray-400 group-hover:text-[#00897B] transition-colors">
+                      <UploadCloud size={32} />
+                    </div>
                     <div className="text-center">
                       <p className="font-lato font-bold text-[14px] text-gray-800">Click to upload</p>
                       <p className="font-lato font-light text-[12px] text-gray-400">SVG, PNG, JPG or GIF</p>
@@ -158,7 +207,7 @@ export default function CreateArticlePage() {
         </div>
       </main>
 
-      {/* 🟢 MODAL & EDITOR (Rendered as portal-like fixed element) */}
+      {/* MODAL & EDITOR */}
       {isEditorOpen && (
         <div onClick={handleBackdropClick} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70 animate-in fade-in duration-200">
           <div 
