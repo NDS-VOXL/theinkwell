@@ -1,38 +1,26 @@
-// app/components/CreatePost.tsx
 'use client';
 
-import { Image as ImageIcon } from 'lucide-react'; // Renamed to avoid conflict with next/image
+import { Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
-
 
 export default function CreatePost() {
   return (
-    <div className="w-full bg-[#FDFBF7] rounded-[30px] p-4 mb-8 flex items-center gap-4 shadow-sm">
-      {/* User Avatar */}
-      <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-200 shrink-0">
-        <Image 
-          src="/user-avatar.png" // Ensure this exists in public folder
-          alt="User" 
-          width={48} 
-          height={48} 
-          className="object-cover w-full h-full"
-        />
+    <div className="w-full bg-[#FDFBF7] rounded-[20px] lg:rounded-[30px] p-3 lg:p-4 mb-6 lg:mb-8 flex items-center gap-3 lg:gap-4 shadow-sm">
+      <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full overflow-hidden border border-gray-200 shrink-0">
+        <Image src="/user-avatar.png" alt="User" width={48} height={48} className="object-cover w-full h-full" />
       </div>
 
-      {/* Input Field */}
       <div className="flex-1">
         <input 
           type="text" 
-          placeholder="Write the first thing you think about..." 
-          className="w-full bg-transparent border-b border-gray-300 pb-2 outline-none text-gray-600 placeholder-gray-400 font-lato focus:border-inkwell-teal transition-colors"
+          placeholder="What's on your mind?" 
+          className="w-full bg-transparent border-b border-gray-200 pb-1.5 outline-none text-xs lg:text-sm text-gray-600 placeholder-gray-400 font-lato focus:border-[#00897B] transition-colors"
         />
       </div>
 
-      {/* Image Upload Icon */}
-      <button className="p-2 bg-teal-800 rounded-lg text-white hover:bg-teal-700 transition-colors">
-        <ImageIcon size={20} />
+      <button className="p-2 bg-teal-800 rounded-lg text-white hover:bg-teal-700 shrink-0">
+        <ImageIcon size={18} />
       </button>
-
     </div>
   );
 }

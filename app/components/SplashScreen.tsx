@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import image from '@/app/assets/images/splash.svg'
+import splashImg from '@/app/assets/images/splash.svg';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -13,8 +13,8 @@ export default function SplashScreen({
   onComplete,
   duration = 3000,
 }: SplashScreenProps) {
-  const [isVisible, setIsVisible] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -22,7 +22,7 @@ export default function SplashScreen({
       setTimeout(() => {
         setIsVisible(false);
         onComplete?.();
-      }, 500); // Fade out animation duration
+      }, 500);
     }, duration);
 
     return () => clearTimeout(timer);
@@ -32,11 +32,19 @@ export default function SplashScreen({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-linear-to-br from-slate-900 via-blue-900 to-slate-800 transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-500 ${
         fadeOut ? "opacity-0" : "opacity-100"
-      }`}
+      } 
+      /* 🟢 REMOVED blue gradient, replaced with deep dark green/black */
+      bg-[#0A1F11]`} 
     >
-      <Image src={image} alt="" className="w-full" />
+      <Image 
+        src={splashImg} 
+        alt="The Inkwell" 
+        className="w-full h-auto"
+        priority // 🟢 Essential: Forces the browser to load this immediately
+        quality={100}
+      />
     </div>
   );
 }
