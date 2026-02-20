@@ -5,6 +5,7 @@ import ink from "@/app/assets/icons/inkwell.svg";
 import image from "@/app/assets/images/background.jpg";
 import Image from "next/image";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react"; // 🟢 Icons for visibility toggle
 import Icon from "./Icon";
 
 type AuthMode = "login" | "register";
@@ -22,20 +23,21 @@ export default function AuthScreen({
   onLogin,
   onRegister,
 }: AuthScreenProps) {
-  // 🟢 Form State
+  // --- FORM STATE ---
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
   });
 
-  // 🟢 Error State
+  // --- UI STATES ---
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showPassword, setShowPassword] = useState(false); // 🟢 Controls visibility
 
   const switchMode = () => {
     const newMode = mode === "register" ? "login" : "register";
     onModeChange?.(newMode);
-    // Note: Errors are reset automatically by the 'key' prop on the container below
+    setShowPassword(false); // Reset visibility on mode switch
   };
 
   const validate = () => {
@@ -52,7 +54,7 @@ export default function AuthScreen({
     if (!formData.password) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      newErrors.password = "Min. 6 characters";
     }
 
     setErrors(newErrors);
@@ -84,13 +86,19 @@ export default function AuthScreen({
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#0A1F11] overflow-hidden">
       
-      {/* 1. LEFT SIDE: Branding (Logo Top, Headline Center, Footer Bottom) */}
-      <div className="relative w-full lg:w-1/2 h-[45vh] lg:h-screen shrink-0 z-10">
-        <Image src={image} alt="background" className="w-full h-full object-cover" priority />
+      {/* 1. LEFT SIDE: Branding & High-Performance Hero Image */}
+      <div className="relative w-full lg:w-1/2 h-[40vh] lg:h-screen shrink-0 z-10">
+        <Image 
+          src={image} 
+          alt="background" 
+          className="w-full h-full object-cover"
+          priority             // Preload: Highest priority
+          fetchPriority="high" // Immediate download hint
+          quality={90}         
+          placeholder="blur"   
+        />
         <div className="absolute inset-0 bg-[#0A1F11]/80 flex flex-col items-center justify-between py-10 lg:py-16 px-6 lg:px-12 text-center text-white">
-          
-          <Image src={ink} alt="The Inkwell" className="w-32 lg:w-auto" />
-          
+          <Image src={ink} alt="The Inkwell" className="w-32 lg:w-auto" priority />
           <div className="max-w-md">
             <h2 className="text-3xl lg:text-[38px] font-bold leading-tight lg:leading-12">
               Create an Article that&apos;s worth sharing
@@ -100,9 +108,8 @@ export default function AuthScreen({
               An original story draws the best views.
             </p>
           </div>
-
           <div className="mt-4 lg:mt-0">
-            <p className="font-lato font-normal text-[10px] lg:text-[12px] leading-[20px] opacity-70 lg:p-7">
+            <p className="font-lato font-normal text-[10px] lg:text-[12px] opacity-70 lg:p-7">
               You can start for free and upgrade for better experience later.
             </p>
           </div>
@@ -111,14 +118,10 @@ export default function AuthScreen({
 
       {/* 2. RIGHT SIDE: Auth Form Container */}
       <div 
-        key={mode} // 🟢 FIX: Resets internal state/errors automatically when mode switches
-        className={`
-          flex-1 bg-[#FDFBF7] z-20 shadow-2xl flex flex-col justify-center items-center
-          rounded-t-[30px] lg:rounded-tr-none lg:rounded-l-[40px]
-          -mt-10 lg:mt-0 px-6 py-12 lg:px-0 lg:py-0
-        `}
+        key={mode} // 🟢 Automatically resets internal state/errors on switch
+        className="flex-1 bg-[#FDFBF7] z-20 shadow-2xl flex flex-col justify-center items-center rounded-t-[30px] lg:rounded-tr-none lg:rounded-l-[40px] -mt-10 lg:mt-0 px-6 py-12 lg:px-0 lg:py-0"
       >
-        <div className="w-full max-w-[420px] px-4 lg:px-8">
+        <div className="w-full max-w-[500px] px-4 lg:px-8">
           <h1 className="inknut-antiqua font-bold text-2xl lg:text-[28px] text-[#2F4F3A] text-center mb-8 lg:mb-10 tracking-tight">
             {mode === "register" ? "Create an Account" : "Welcome Back"}
           </h1>
@@ -126,7 +129,7 @@ export default function AuthScreen({
           <form className="space-y-5 lg:space-y-6" noValidate>
             {mode === "register" && (
               <div className="flex flex-col relative">
-                <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter ${errors.fullName ? 'text-red-500' : 'text-gray-700'}`}>
+                <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 ${errors.fullName ? 'text-red-500' : 'text-gray-700'}`}>
                   Full Name
                 </label>
                 <input
@@ -136,12 +139,12 @@ export default function AuthScreen({
                   placeholder="Enter Full Name"
                   className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all ${errors.fullName ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
                 />
-                {errors.fullName && <span className="text-[9px] text-red-500 mt-1 ml-2">{errors.fullName}</span>}
+                {errors.fullName && <span className="text-[9px] text-red-500 mt-1 ml-2 font-medium">{errors.fullName}</span>}
               </div>
             )}
 
             <div className="flex flex-col relative">
-              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter ${errors.email ? 'text-red-500' : 'text-gray-700'}`}>
+              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 ${errors.email ? 'text-red-500' : 'text-gray-700'}`}>
                 Email Address
               </label>
               <input
@@ -151,21 +154,31 @@ export default function AuthScreen({
                 placeholder="Enter Valid Email"
                 className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all ${errors.email ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
               />
-              {errors.email && <span className="text-[9px] text-red-500 mt-1 ml-2">{errors.email}</span>}
+              {errors.email && <span className="text-[9px] text-red-500 mt-1 ml-2 font-medium">{errors.email}</span>}
             </div>
 
+            {/* 🟢 PASSWORD INPUT WITH EYE TOGGLE */}
             <div className="flex flex-col relative">
-              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter ${errors.password ? 'text-red-500' : 'text-gray-700'}`}>
+              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 ${errors.password ? 'text-red-500' : 'text-gray-700'}`}>
                 Password
               </label>
-              <input
-                name="password"
-                type="password"
-                onChange={handleInputChange}
-                placeholder="Create Password"
-                className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all ${errors.password ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
-              />
-              {errors.password && <span className="text-[9px] text-red-500 mt-1 ml-2">{errors.password}</span>}
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"} // Dynamic type
+                  onChange={handleInputChange}
+                  placeholder={mode === "register" ? "Create Password" : "Enter Password"}
+                  className={`w-full border rounded-xl bg-transparent px-5 py-4 pr-12 text-sm outline-none transition-all ${errors.password ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
+                />
+                <button
+                  type="button" // 🟢 Prevent accidental form submission
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#008080] transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.password && <span className="text-[9px] text-red-500 mt-1 ml-2 font-medium">{errors.password}</span>}
             </div>
 
             <div className="space-y-4 pt-2">
@@ -186,10 +199,14 @@ export default function AuthScreen({
               </button>
             </div>
 
-            <div className="text-center pt-6">
+            <div className="text-center pt-6 pb-2">
               <p className="text-[12px] text-gray-500">
                 {mode === "register" ? "Already have an account? " : "Don't have an account? "}
-                <button type="button" onClick={switchMode} className="font-extrabold text-[#2F4F3A] hover:underline">
+                <button 
+                  type="button" 
+                  onClick={switchMode} 
+                  className="font-extrabold text-[#2F4F3A] hover:underline"
+                >
                   {mode === "register" ? "Sign in" : "Sign up"}
                 </button>
               </p>
