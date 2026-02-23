@@ -1,5 +1,5 @@
 "use client";
-import { useProfile } from "@/app/profile/profileContent"; // Ensure correct path
+import { useProfile } from "@/app/profile/profileContent"; 
 import {
   Bookmark,
   BookOpen,
@@ -12,10 +12,13 @@ import {
   TrendingUp,
   Users,
   X,
-  Trash2 // 🟢 Trash icon for deleting
+  Trash2
 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
+
+// 🟢 1. Import your Placeholder Component!
+import ArticleCard from "@/app/components/ArticleCard";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 const highlights = [
@@ -59,7 +62,7 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      updateUser({ avatar: url }); 
+      updateUser({ avatar: url });
     }
   };
 
@@ -95,14 +98,13 @@ export default function ProfilePage() {
     setIsLinkModalOpen(false);
   };
 
-  // 🟢 LOGIC: Direct Delete from the UI
   const handleDeleteLinkDirect = (index: number) => {
     const newLinks = links.filter((_, i) => i !== index);
     setLinks(newLinks);
   };
 
   return (
-    <div>
+    <div style={{ paddingBottom: 60 }}>
       <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet" />
 
       {/* Hidden File Input */}
@@ -182,8 +184,6 @@ export default function ProfilePage() {
                 <div key={i} style={{ width: "100%", padding: "8px", border: "1px solid #f0f0f0", borderRadius: "10px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                     <p style={{ fontWeight: 700, fontSize: 12, color: "#333" }}>{l.platform}</p>
-                    
-                    {/* 🟢 Action Icons (Edit & Delete side-by-side) */}
                     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                       <Pencil size={12} color="#888" style={{ cursor: "pointer" }} onClick={() => handleOpenEditLink(i)} />
                       <Trash2 size={12} color="#ef4444" style={{ cursor: "pointer" }} onClick={() => handleDeleteLinkDirect(i)} />
@@ -228,6 +228,109 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* 🟢 ── NEW: Dashed Divider ── */}
+      <div style={{ width: "100%", borderTop: "2px dashed #e0e0e0", margin: "40px 0" }}></div>
+
+      {/* 🟢 ── NEW: Bottom Layout (Activities & Sidebar) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 40 }}>
+        
+        {/* Left: Your Activities */}
+        <div>
+          <h3 style={{ fontWeight: 900, fontSize: 20, color: "#111", margin: "0 0 4px 0" }}>Your Activities</h3>
+          <p style={{ fontSize: 12, color: "#888", margin: "0 0 24px 0" }}>Shared by you.</p>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Using the ArticleCard component placeholder! */}
+            <ArticleCard />
+            <ArticleCard />
+          </div>
+        </div>
+
+        {/* Right: Sidebar Content */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+          
+          {/* Widget: Suggested Writers */}
+          <div>
+            <h3 style={{ fontWeight: 900, fontSize: 16, color: "#111", margin: "0 0 4px 0" }}>Suggested Writers</h3>
+            <p style={{ fontSize: 10, color: "#888", margin: "0 0 16px 0", textTransform: "uppercase", fontWeight: 700 }}>Based on your profile</p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                { name: 'Tetharus Honet', tags: 'Artist | Educational | Health...' },
+                { name: 'Loveren Paul', tags: 'Artist | Educational | Health...' },
+                { name: 'Cassandra Peter', tags: 'Artist | Educational | Health...' }
+              ].map((writer, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#FDFBF7", borderRadius: 16, border: "1px solid #f0f0f0", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e0e0e0", overflow: "hidden" }}>
+                       <Image src={user.avatar} alt={writer.name} width={40} height={40} style={{ objectFit: "cover" }} />
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#111" }}>{writer.name}</p>
+                      <p style={{ margin: 0, fontSize: 9, color: "#888" }}>{writer.tags}</p>
+                    </div>
+                  </div>
+                  <button style={{ padding: "6px 14px", background: "#00897B", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 20, border: "none", cursor: "pointer" }}>Follow +</button>
+                </div>
+              ))}
+            </div>
+            <button style={{ width: "100%", marginTop: 16, padding: "12px", background: "#111", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 30, border: "none", cursor: "pointer" }}>
+              See More... →
+            </button>
+          </div>
+
+          <div style={{ width: "100%", borderTop: "2px dashed #e0e0e0" }}></div>
+
+          {/* Widget: Community Chats (Dark Theme) */}
+          <div style={{ background: "#1a1a1a", padding: 24, borderRadius: 24, boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
+            <h3 style={{ margin: "0 0 20px 0", fontSize: 12, fontWeight: 700, color: "#888", textAlign: "center", textTransform: "uppercase" }}>Community chats</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {['Ha Ppiness Ifeoma', 'Itz Bless Chinonso', 'Aai Sha', 'Unique Precious', 'Real Suxcy'].map((name, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(45deg, #f59e0b, #ef4444)", padding: 2 }}>
+                    <div style={{ width: "100%", height: "100%", background: "#1a1a1a", borderRadius: "50%", overflow: "hidden" }}>
+                       <Image src="/user-avatar.jpg" alt={name} width={32} height={32} style={{ objectFit: "cover" }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#ddd" }}>{name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Widget: New Followers */}
+          <div>
+            <h3 style={{ fontWeight: 900, fontSize: 16, color: "#111", margin: "0 0 16px 0" }}>New Followers</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                { name: 'Paulina Hutchinson', tags: 'Artist | Educational | Health...' },
+                { name: 'Hester Titian', tags: 'Artist | Educational | Health...' },
+                { name: 'Jackie Chan Z', tags: 'Artist | Educational | Health...' }
+              ].map((follower, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#FDFBF7", borderRadius: 16, border: "1px solid #f0f0f0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e0e0e0", overflow: "hidden" }}>
+                       <Image src={user.avatar} alt={follower.name} width={40} height={40} style={{ objectFit: "cover" }} />
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#111" }}>{follower.name}</p>
+                      <p style={{ margin: 0, fontSize: 9, color: "#888" }}>{follower.tags}</p>
+                    </div>
+                  </div>
+                  <button style={{ padding: "6px 14px", background: "#00897B", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 20, border: "none", cursor: "pointer" }}>Follow +</button>
+                </div>
+              ))}
+            </div>
+            <button style={{ width: "100%", marginTop: 16, padding: "12px", background: "#111", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 30, border: "none", cursor: "pointer" }}>
+              See More... →
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── MODALS (Bio & Links) REMAIN UNCHANGED BELOW ── */}
+      
       {/* ── EDIT BIO MODAL ── */}
       {isModalOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(2px)" }}>
@@ -283,7 +386,6 @@ export default function ProfilePage() {
   );
 }
 
-// ─── Shared Styles ────────────────────────────────────────────────────────────
 const card: React.CSSProperties = {
   borderRadius: 16,
   padding: "18px 20px",
