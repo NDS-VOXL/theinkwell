@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Users,
   X,
-  Trash2
+  Trash2 // 🟢 Trash icon for deleting
 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -37,8 +37,6 @@ const categories = ["Health & Lifestyle", "Sports", "Entertainment"];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function ProfilePage() {
-  // 🟢 1. Initialize links as an empty array! 
-  // We add TypeScript typing so it knows what shape the objects should be.
   const [links, setLinks] = useState<{ platform: string; url: string }[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
@@ -71,14 +69,14 @@ export default function ProfilePage() {
   };
 
   const handleOpenAddLink = () => {
-    setEditingIdx(null); // Null means Add
+    setEditingIdx(null);
     setTempPlatform("");
     setTempUrl("");
     setIsLinkModalOpen(true);
   };
 
   const handleOpenEditLink = (index: number) => {
-    setEditingIdx(index); // Index means Edit
+    setEditingIdx(index);
     setTempPlatform(links[index].platform);
     setTempUrl(links[index].url);
     setIsLinkModalOpen(true);
@@ -97,12 +95,10 @@ export default function ProfilePage() {
     setIsLinkModalOpen(false);
   };
 
-  const handleDeleteLink = () => {
-    if (editingIdx !== null) {
-      const newLinks = links.filter((_, i) => i !== editingIdx);
-      setLinks(newLinks);
-      setIsLinkModalOpen(false);
-    }
+  // 🟢 LOGIC: Direct Delete from the UI
+  const handleDeleteLinkDirect = (index: number) => {
+    const newLinks = links.filter((_, i) => i !== index);
+    setLinks(newLinks);
   };
 
   return (
@@ -177,17 +173,21 @@ export default function ProfilePage() {
           <p style={{ fontWeight: 900, fontSize: 14, color: "#111", marginBottom: 14 }}>Public Links</p>
           
           <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", alignItems: "center" }}>
-            {/* 🟢 Empty State Handling */}
             {links.length === 0 ? (
               <p style={{ fontSize: 11, color: "#999", fontStyle: "italic", textAlign: "center", width: "100%" }}>
                 No links added yet.
               </p>
             ) : (
               links.map((l, i) => (
-                <div key={i} style={{ width: "100%" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-                    <p style={{ fontWeight: 700, fontSize: 11, color: "#333" }}>{l.platform}</p>
-                    <Pencil size={11} color="#888" style={{ cursor: "pointer" }} onClick={() => handleOpenEditLink(i)} />
+                <div key={i} style={{ width: "100%", padding: "8px", border: "1px solid #f0f0f0", borderRadius: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <p style={{ fontWeight: 700, fontSize: 12, color: "#333" }}>{l.platform}</p>
+                    
+                    {/* 🟢 Action Icons (Edit & Delete side-by-side) */}
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <Pencil size={12} color="#888" style={{ cursor: "pointer" }} onClick={() => handleOpenEditLink(i)} />
+                      <Trash2 size={12} color="#ef4444" style={{ cursor: "pointer" }} onClick={() => handleDeleteLinkDirect(i)} />
+                    </div>
                   </div>
                   <p style={{ fontSize: 10, color: "#00897B", fontWeight: 400, wordBreak: "break-all" }}>{l.url}</p>
                 </div>
@@ -273,20 +273,9 @@ export default function ProfilePage() {
               <input value={tempUrl} onChange={(e) => setTempUrl(e.target.value)} placeholder="https://" style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1px solid #ddd", outline: "none", fontSize: 14, boxSizing: "border-box" }} />
             </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              {editingIdx !== null && (
-                <button 
-                  onClick={handleDeleteLink} 
-                  style={{ flex: 1, padding: 16, backgroundColor: "#fee2e2", color: "#ef4444", borderRadius: 30, border: "none", fontWeight: 900, cursor: "pointer", fontSize: 14, display: "flex", justifyContent: "center", alignItems: "center", gap: 6 }}
-                >
-                  <Trash2 size={16} /> Delete
-                </button>
-              )}
-              
-              <button onClick={handleSaveLink} style={{ flex: 2, padding: 16, backgroundColor: "#00897B", color: "#fff", borderRadius: 30, border: "none", fontWeight: 900, cursor: "pointer", fontSize: 14 }}>
-                {editingIdx !== null ? "Update Link" : "Add Link"}
-              </button>
-            </div>
+            <button onClick={handleSaveLink} style={{ width: "100%", padding: 16, backgroundColor: "#00897B", color: "#fff", borderRadius: 30, border: "none", fontWeight: 900, cursor: "pointer", fontSize: 14 }}>
+              {editingIdx !== null ? "Update Link" : "Add Link"}
+            </button>
           </div>
         </div>
       )}
