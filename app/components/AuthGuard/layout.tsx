@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { Lato } from "next/font/google";
 import "./globals.css";
 
-import { ProfileProvider } from '../app/profile/profileContent'; 
-import AuthGuard from '../app/components/AuthGuard/authGuard'; // 🟢 1. Import the new Guard
+import { ProfileProvider } from '../../profile/profileContent'; 
+import AuthGuard from '../AuthGuard/authGuard'; // 🟢 1. Import the new Guard
 
 const lato = Lato({
   subsets: ["latin"],
