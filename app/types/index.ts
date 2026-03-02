@@ -1,3 +1,4 @@
+// app/types/index.ts
 import { Timestamp } from "firebase/firestore";
 
 export interface Article {
@@ -11,9 +12,11 @@ export interface Article {
   authorAvatar: string;
   readTime: string;
   likesCount: number;
+  dislikesCount: number; // 🟢 ADD THIS
   commentsCount: number;
   createdAt: Timestamp;
-  likes: string[]; // Array of user UIDs who liked
+  likes: string[];      // 🟢 Array of user UIDs
+  dislikes: string[];   // 🟢 ADD THIS
 }
 
 export interface ArticleComment {

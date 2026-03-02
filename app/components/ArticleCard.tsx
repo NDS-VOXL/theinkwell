@@ -1,131 +1,164 @@
 "use client";
 
 import React, { useState } from 'react';
-import { ThumbsUp, MessageSquare, MoreVertical, Share2, ThumbsDown } from 'lucide-react';
+import { 
+  ThumbsUp, MessageSquare, MoreVertical, Share2, 
+  ThumbsDown, Trash2, Loader2 
+} from 'lucide-react';
 import Link from 'next/link';
 import { db, auth } from "@/app/firebase";
-import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
-
-// 🟢 Define the shape of your article for full Type Safety
-interface Article {
-  id: string;
-  authorId: string;
-  authorName: string;
-  authorAvatar: string;
-  title: string;
-  categories: string[];
-  imageUrl: string;
-  likesCount: number;
-  commentsCount: number;
-  readTime: string;
-}
+import { doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { Article } from '@/app/types';
 
 interface ArticleCardProps {
   article: Article;
-  currentUserFollowing: string[]; // Pass this from the Home feed parent
+  isOwner?: boolean;
 }
 
-export default function ArticleCard({ article, currentUserFollowing }: ArticleCardProps) {
-  // Local state for immediate UI feedback
-  const [isFollowing, setIsFollowing] = useState(currentUserFollowing?.includes(article.authorId));
+export default function ArticleCard({ article, isOwner }: ArticleCardProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const userId = auth.currentUser?.uid;
 
-  // Helper to format counts (e.g., 1200 -> 1.2k)
-  const formatCount = (num: number): string => {
-    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-    return num.toString();
-  };
+  // --- 🟢 ROBUST LIKE / DISLIKE LOGIC ---
+  const handleEngagement = async (e: React.MouseEvent, type: 'like' | 'dislike') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!userId) return;
 
-  // Logic to handle follow actions
-  const handleFollow = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevents clicking the button from triggering the Link
-    if (!auth.currentUser) return;
+    const articleRef = doc(db, "articles", article.id);
+    
+    // Ensure we are working with arrays (default to empty if they don't exist yet)
+    const currentLikes = article.likes || [];
+    const currentDislikes = article.dislikes || [];
+    
+    let newLikes = [...currentLikes];
+    let newDislikes = [...currentDislikes];
+
+    if (type === 'like') {
+      // 1. Toggle Like: If already liked, remove it. If not, add it.
+      if (newLikes.includes(userId)) {
+        newLikes = newLikes.filter(id => id !== userId);
+      } else {
+        newLikes.push(userId);
+      }
+      // 2. Always remove from Dislikes if Liking
+      newDislikes = newDislikes.filter(id => id !== userId);
+    } else {
+      // 1. Toggle Dislike: If already disliked, remove it. If not, add it.
+      if (newDislikes.includes(userId)) {
+        newDislikes = newDislikes.filter(id => id !== userId);
+      } else {
+        newDislikes.push(userId);
+      }
+      // 2. Always remove from Likes if Disliking
+      newLikes = newLikes.filter(id => id !== userId);
+    }
 
     try {
-      const myRef = doc(db, "users", auth.currentUser.uid);
-      const authorRef = doc(db, "users", article.authorId);
-
-      // Atomically update both users
-      await updateDoc(myRef, { following: arrayUnion(article.authorId) });
-      await updateDoc(authorRef, { followersCount: increment(1) });
-      
-      setIsFollowing(true);
-    } catch (error) {
-      console.error("Follow error:", error);
+      // 🟢 Update Firestore with CALCULATED lengths (prevents -1)
+      await updateDoc(articleRef, {
+        likes: newLikes,
+        likesCount: newLikes.length,
+        dislikes: newDislikes,
+        dislikesCount: newDislikes.length
+      });
+    } catch (err) {
+      console.error("Engagement error:", err);
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Delete this story permanently?")) {
+      setIsDeleting(true);
+      try {
+        await deleteDoc(doc(db, "articles", article.id));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const userHasLiked = article.likes?.includes(userId || "");
+  const userHasDisliked = article.dislikes?.includes(userId || "");
+
   return (
-    <div className="w-full bg-[#FDFBF7] rounded-[32px] p-6 mb-6 shadow-sm border border-gray-100 group transition-all font-lato hover:shadow-md hover:border-[#00897B]/20">
+    <div className={`w-full bg-white rounded-[32px] p-6 mb-8 border border-gray-100 transition-all hover:shadow-md font-lato ${isDeleting ? 'opacity-50 grayscale' : ''}`}>
       
-      {/* 1. HEADER: Author Profile & Follow Button */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Header: Author & Follow */}
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 shrink-0">
-            <img 
-              src={article.authorAvatar || "/default-avatar.png"} 
-              alt={article.authorName} 
-              className="w-full h-full object-cover" 
-            />
-          </div>
+          <img src={article.authorAvatar || "/default-avatar.png"} className="w-10 h-10 rounded-full object-cover" alt="Author" />
           <div className="flex flex-col">
-            <h3 className="text-sm font-black text-gray-900">{article.authorName}</h3>
-            <span className="text-[10px] text-gray-400 font-bold">{article.readTime}</span>
+            <h3 className="text-[13px] font-black text-gray-900 leading-tight">{article.authorName}</h3>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Just Now</span>
           </div>
-          
-          {/* Hide button if already following OR if it's the user's own post */}
-          {!isFollowing && auth.currentUser?.uid !== article.authorId && (
-            <button 
-              onClick={handleFollow} 
-              className="bg-[#00897B] text-white text-[10px] px-4 py-1.5 rounded-full font-bold hover:bg-teal-800 transition-all active:scale-95"
-            >
+          {userId !== article.authorId && (
+            <button className="ml-2 bg-[#00897B] text-white text-[9px] px-4 py-1.5 rounded-full font-black uppercase tracking-wider">
               Follow +
             </button>
           )}
         </div>
-        <button className="text-gray-400 hover:text-gray-600 p-1">
-          <MoreVertical size={18} />
-        </button>
+
+        <div className="flex items-center gap-2">
+          {isOwner && (
+            <button onClick={handleDelete} className="p-2 text-red-400 hover:bg-red-50 rounded-full transition-all">
+              {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            </button>
+          )}
+          <button className="text-gray-300 hover:text-gray-600"><MoreVertical size={20} /></button>
+        </div>
       </div>
 
-      {/* 2. CONTENT: Title, Categories & Featured Image */}
-      <Link href={`/home/article/${article.id}`} className="block">
-        <h2 className="text-xl font-black mb-3 text-gray-900 group-hover:text-[#00897B] transition-colors leading-tight">
-          {article.title}
-        </h2>
-        
-        <div className="flex flex-wrap gap-2 mb-4">
-          {article.categories?.map(cat => (
-            <span key={cat} className="bg-[#2F4F3A] text-white text-[9px] px-3 py-1 rounded-full font-black uppercase tracking-wider">
-              {cat}
-            </span>
-          ))}
+      {/* Content */}
+      <Link href={`/home/article/${article.id}`} className="group">
+        <div className="text-center mb-5 px-4">
+          <h2 className="text-[22px] font-black mb-2 text-gray-900 group-hover:text-[#00897B] transition-colors leading-tight">
+            {article.title}
+          </h2>
+          <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 font-bold uppercase">
+            <span>{article.readTime}</span>
+            <span className="w-1 h-1 bg-gray-200 rounded-full" />
+            <span>{article.likesCount || 0} Likes</span>
+          </div>
         </div>
 
-        <div className="relative aspect-video rounded-[24px] overflow-hidden mb-5 bg-gray-100">
-          <img 
-            src={article.imageUrl} 
-            alt="Article Banner" 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-          />
+        <div className="aspect-[16/9] rounded-[28px] overflow-hidden mb-6 shadow-sm border border-gray-50">
+          <img src={article.imageUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Banner" />
         </div>
       </Link>
-      
-      {/* 3. ACTIONS: Engagement Buttons */}
-      <div className="grid grid-cols-4 gap-3">
-        <button className="flex items-center justify-center gap-2 py-3 border border-[#00897B] text-[#00897B] rounded-2xl text-[10px] font-black hover:bg-teal-50 transition-all active:scale-[0.98]">
-          <ThumbsUp size={14} /> {formatCount(article.likesCount)}
+
+      {/* 🟢 INTERACTION BAR (Dashed Border) */}
+      <div className="flex items-center justify-around pt-5 border-t border-dashed border-gray-100">
+        <button 
+          onClick={(e) => handleEngagement(e, 'like')}
+          className={`flex items-center gap-2 text-[10px] font-black transition-all ${userHasLiked ? 'text-[#00897B]' : 'text-gray-400'}`}
+        >
+          <ThumbsUp size={18} className={userHasLiked ? "fill-[#00897B]" : ""} />
+          LIKE
+          <span className="ml-0.5 font-black">{article.likesCount || 0}</span>
         </button>
 
-        <button className="flex items-center justify-center gap-2 py-3 border border-gray-200 text-gray-400 rounded-2xl text-[10px] font-black hover:bg-gray-50 transition-all">
-          <ThumbsDown size={14} />
+        <button 
+          onClick={(e) => handleEngagement(e, 'dislike')}
+          className={`flex items-center gap-2 text-[10px] font-black transition-all ${userHasDisliked ? 'text-red-400' : 'text-gray-400'}`}
+        >
+          <ThumbsDown size={18} className={userHasDisliked ? "fill-red-400" : ""} />
+          DISLIKE
+          <span className="ml-0.5 font-black">{article.dislikesCount || 0}</span>
         </button>
 
-        <Link href={`/home/article/${article.id}#comments`} className="flex items-center justify-center gap-2 py-3 border border-[#00897B] text-[#00897B] rounded-2xl text-[10px] font-black hover:bg-teal-50 transition-all">
-          <MessageSquare size={14} /> {formatCount(article.commentsCount)}
+        <Link href={`/home/article/${article.id}`} className="flex items-center gap-2 text-[10px] font-black text-gray-400">
+          <MessageSquare size={18} />
+          COMMENT
         </Link>
 
-        <button className="flex items-center justify-center gap-2 py-3 border border-[#00897B] text-[#00897B] rounded-2xl text-[10px] font-black hover:bg-teal-50 transition-all">
-          <Share2 size={14} />
+        <button className="flex items-center gap-2 text-[10px] font-black text-gray-400">
+          <Share2 size={18} />
+          SHARE
         </button>
       </div>
     </div>
