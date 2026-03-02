@@ -1,45 +1,64 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useState } from "react";
-import ArticleCard from "../components/ArticleCard";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-interface UserData {
+interface UserProfile {
   name: string;
   bio: string;
   avatar: string;
 }
 
 interface ProfileContextType {
-  user: UserData;
-  updateUser: (newData: Partial<UserData>) => void;
+  user: UserProfile;
+  updateUser: (updates: Partial<UserProfile>) => void;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
-export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserData>({
-    name: "Loveren Paul",
-    bio: "I find Comfort In my pain",
-    avatar: "/user-avatar.jpg", // Ensure this image is in your public folder!
+export function ProfileProvider({ children }: { children: React.ReactNode }) {
+  // 1. Start completely empty so there is no fake mock data
+  const [user, setUser] = useState<UserProfile>({
+    name: "",
+    bio: "",
+    avatar: "",
   });
 
-  const updateUser = (newData: Partial<UserData>) => {
-    setUser((prev) => ({ ...prev, ...newData }));
+  // 2. Hydrate from localStorage when the app loads
+  useEffect(() => {
+    // 🟢 The Fix: Pushes the state update to the next tick to prevent the cascading render warning
+    setTimeout(() => {
+      setUser({
+        name: localStorage.getItem("userName") || "New User",
+        bio: localStorage.getItem("userBio") || "",
+        avatar: localStorage.getItem("userAvatar") || "",
+      });
+    }, 0);
+  }, []);
+
+  // 3. Update state AND localStorage simultaneously
+  const updateUser = (updates: Partial<UserProfile>) => {
+    setUser((prev) => {
+      const newUser = { ...prev, ...updates };
+      
+      if (updates.name !== undefined) localStorage.setItem("userName", updates.name);
+      if (updates.bio !== undefined) localStorage.setItem("userBio", updates.bio);
+      if (updates.avatar !== undefined) localStorage.setItem("userAvatar", updates.avatar);
+      
+      return newUser;
+    });
   };
 
   return (
-    <>
-      <ProfileContext.Provider value={{ user, updateUser }}>
-        {children}
-      </ProfileContext.Provider>
-     
-    </>
+    <ProfileContext.Provider value={{ user, updateUser }}>
+      {children}
+    </ProfileContext.Provider>
   );
 }
 
-export const useProfile = () => {
+export function useProfile() {
   const context = useContext(ProfileContext);
-  if (!context)
+  if (context === undefined) {
     throw new Error("useProfile must be used within a ProfileProvider");
+  }
   return context;
-};
+}

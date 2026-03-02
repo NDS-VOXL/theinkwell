@@ -1,12 +1,12 @@
-// app/components/RightSidebar.tsx
 'use client';
 
 import { TrendingUp, UserPlus, Users } from 'lucide-react';
 import Image from 'next/image';
 
 export default function RightSidebar() {
+  // 🟢 CHANGED: "hidden xl:flex" is now "hidden lg:flex" so it shows on smaller screens/zoomed browsers!
   return (
-    <aside className="w-80 hidden xl:flex flex-col gap-8 shrink-0">
+    <aside className="w-80 hidden lg:flex flex-col gap-8 shrink-0">
       
       {/* WIDGET 1: Your Highlights */}
       <div className="flex flex-col gap-4">
@@ -53,7 +53,6 @@ export default function RightSidebar() {
            <span className="text-xs text-gray-400">Based on your profile</span>
         </div>
         
-        {/* We can map through users here later */}
         {/* Placeholder for Writer List */}
         <div className="bg-[#FDFBF7] p-4 rounded-2xl h-40 flex items-center justify-center text-gray-400 text-sm">
            User List Component Here...
