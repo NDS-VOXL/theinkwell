@@ -145,9 +145,9 @@ export default function ArticleDetailsPage() {
   if (!article) return <div className="h-screen flex items-center justify-center bg-[#FDFBF7] text-[#00897B] font-black animate-pulse">Opening The Inkwell...</div>;
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#FDFBF7]">
+    <div className="">
 
-      <main className="flex-1 overflow-y-auto font-lato relative">
+      <main className="">
 
 
         <div className="max-w-4xl mx-auto px-6 pt-6 pb-40">
