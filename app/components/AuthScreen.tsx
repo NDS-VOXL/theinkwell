@@ -5,16 +5,17 @@ import ink from "@/app/assets/icons/inkwell.svg";
 import image from "@/app/assets/images/background.jpg";
 import Image from "next/image";
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react"; // 🟢 Icons for visibility toggle
-import Icon from "./Icon";
+import { Eye, EyeOff } from "lucide-react";
+import Icon from "./Icon"; 
 
 type AuthMode = "login" | "register";
 
 interface AuthScreenProps {
   mode?: AuthMode;
   onModeChange?: (mode: AuthMode) => void;
-  onLogin?: (email: string, password: string) => void;
-  onRegister?: (email: string, password: string, name: string) => void;
+  onLogin?: (email: string, password: string) => Promise<void> | void;
+  onRegister?: (email: string, password: string, name: string) => Promise<void> | void;
+  onGoogleSignIn?: () => Promise<void> | void;
 }
 
 export default function AuthScreen({
@@ -22,24 +23,26 @@ export default function AuthScreen({
   onModeChange,
   onLogin,
   onRegister,
+  onGoogleSignIn,
 }: AuthScreenProps) {
-  // --- FORM STATE ---
+  
+  // 🟢 1. RE-ADDED: The missing formData state
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
   });
 
-  // --- UI STATES ---
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [showPassword, setShowPassword] = useState(false); // 🟢 Controls visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   const switchMode = () => {
     const newMode = mode === "register" ? "login" : "register";
     onModeChange?.(newMode);
-    setShowPassword(false); // Reset visibility on mode switch
+    setShowPassword(false);
   };
 
+  // 🟢 2. RE-ADDED: Validation Logic
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
 
@@ -61,16 +64,7 @@ export default function AuthScreen({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAuthAction = () => {
-    if (validate()) {
-      if (mode === "login") {
-        onLogin?.(formData.email, formData.password);
-      } else {
-        onRegister?.(formData.email, formData.password, formData.fullName);
-      }
-    }
-  };
-
+  // 🟢 3. RE-ADDED: Input Change Handler
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -83,27 +77,37 @@ export default function AuthScreen({
     }
   };
 
+  const handleAuthAction = () => {
+    if (validate()) {
+      if (mode === "login") {
+        onLogin?.(formData.email, formData.password);
+      } else {
+        onRegister?.(formData.email, formData.password, formData.fullName);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#0A1F11] overflow-hidden">
       
-      {/* 1. LEFT SIDE: Branding & High-Performance Hero Image */}
+      {/* LEFT SIDE: Branding & Hero */}
       <div className="relative w-full lg:w-1/2 h-[40vh] lg:h-screen shrink-0 z-10">
         <Image 
           src={image} 
           alt="background" 
           className="w-full h-full object-cover"
-          priority             // Preload: Highest priority
-          fetchPriority="high" // Immediate download hint
-          quality={90}         
+          priority 
+          fetchPriority="high"
+          quality={90}          
           placeholder="blur"   
         />
         <div className="absolute inset-0 bg-[#0A1F11]/80 flex flex-col items-center justify-between py-10 lg:py-16 px-6 lg:px-12 text-center text-white">
           <Image src={ink} alt="The Inkwell" className="w-32 lg:w-auto" priority />
           <div className="max-w-md">
-            <h2 className="text-3xl lg:text-[38px] font-bold leading-tight lg:leading-12">
+            <h2 className="text-3xl lg:text-[38px] font-bold leading-tight lg:leading-12 font-lato">
               Create an Article that&apos;s worth sharing
             </h2>
-            <p className="hidden md:block text-xs lg:text-sm text-[#CDD0CE] font-semibold mt-4 lg:mt-6 px-10">
+            <p className="hidden md:block text-xs lg:text-sm text-[#CDD0CE] font-semibold mt-4 lg:mt-6 px-10 font-lato">
               You can write from your heart, and make a person time worth it. 
               An original story draws the best views.
             </p>
@@ -116,9 +120,9 @@ export default function AuthScreen({
         </div>
       </div>
 
-      {/* 2. RIGHT SIDE: Auth Form Container */}
+      {/* RIGHT SIDE: Auth Form */}
       <div 
-        key={mode} // 🟢 Automatically resets internal state/errors on switch
+        key={mode} 
         className="flex-1 bg-[#FDFBF7] z-20 shadow-2xl flex flex-col justify-center items-center rounded-t-[30px] lg:rounded-tr-none lg:rounded-l-[40px] -mt-10 lg:mt-0 px-6 py-12 lg:px-0 lg:py-0"
       >
         <div className="w-full max-w-[500px] px-4 lg:px-8">
@@ -126,52 +130,57 @@ export default function AuthScreen({
             {mode === "register" ? "Create an Account" : "Welcome Back"}
           </h1>
 
-          <form className="space-y-5 lg:space-y-6" noValidate>
+          <form className="space-y-5 lg:space-y-6" noValidate onSubmit={(e) => e.preventDefault()}>
             {mode === "register" && (
               <div className="flex flex-col relative">
-                <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 ${errors.fullName ? 'text-red-500' : 'text-gray-700'}`}>
+                <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 font-lato ${errors.fullName ? 'text-red-500' : 'text-gray-700'}`}>
                   Full Name
                 </label>
                 <input
                   name="fullName"
                   type="text"
+                  autoComplete="name"
+                  value={formData.fullName} // 🟢 Bind value
                   onChange={handleInputChange}
                   placeholder="Enter Full Name"
-                  className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all ${errors.fullName ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
+                  className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all font-lato ${errors.fullName ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
                 />
                 {errors.fullName && <span className="text-[9px] text-red-500 mt-1 ml-2 font-medium">{errors.fullName}</span>}
               </div>
             )}
 
             <div className="flex flex-col relative">
-              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 ${errors.email ? 'text-red-500' : 'text-gray-700'}`}>
+              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 font-lato ${errors.email ? 'text-red-500' : 'text-gray-700'}`}>
                 Email Address
               </label>
               <input
                 name="email"
                 type="email"
+                autoComplete="email"
+                value={formData.email} // 🟢 Bind value
                 onChange={handleInputChange}
                 placeholder="Enter Valid Email"
-                className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all ${errors.email ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
+                className={`w-full border rounded-xl bg-transparent px-5 py-4 text-sm outline-none transition-all font-lato ${errors.email ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
               />
               {errors.email && <span className="text-[9px] text-red-500 mt-1 ml-2 font-medium">{errors.email}</span>}
             </div>
 
-            {/* 🟢 PASSWORD INPUT WITH EYE TOGGLE */}
             <div className="flex flex-col relative">
-              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 ${errors.password ? 'text-red-500' : 'text-gray-700'}`}>
+              <label className={`-top-2 left-5 font-bold absolute bg-[#FDFBF7] px-2 text-[10px] uppercase tracking-tighter z-10 font-lato ${errors.password ? 'text-red-500' : 'text-gray-700'}`}>
                 Password
               </label>
               <div className="relative">
                 <input
                   name="password"
-                  type={showPassword ? "text" : "password"} // Dynamic type
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={mode === "register" ? "new-password" : "current-password"}
+                  value={formData.password} // 🟢 Bind value
                   onChange={handleInputChange}
                   placeholder={mode === "register" ? "Create Password" : "Enter Password"}
-                  className={`w-full border rounded-xl bg-transparent px-5 py-4 pr-12 text-sm outline-none transition-all ${errors.password ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
+                  className={`w-full border rounded-xl bg-transparent px-5 py-4 pr-12 text-sm outline-none transition-all font-lato ${errors.password ? 'border-red-500' : 'border-gray-200 focus:border-[#008080]'}`}
                 />
                 <button
-                  type="button" // 🟢 Prevent accidental form submission
+                  type="button" 
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#008080] transition-colors"
                 >
@@ -185,14 +194,15 @@ export default function AuthScreen({
               <button
                 type="button"
                 onClick={handleAuthAction}
-                className="w-full text-sm bg-[#008080] text-white font-bold py-4 rounded-full shadow-md hover:bg-[#006666] transition-all active:scale-95"
+                className="w-full text-sm bg-[#008080] text-white font-bold py-4 rounded-full shadow-md hover:bg-[#006666] transition-all active:scale-95 font-lato"
               >
                 {mode === "register" ? "Sign up" : "Sign in"}
               </button>
 
               <button
                 type="button"
-                className="w-full border border-gray-200 bg-white flex items-center justify-center text-gray-800 py-4 rounded-full text-sm font-bold hover:bg-gray-50 transition-all active:scale-95"
+                onClick={onGoogleSignIn}
+                className="w-full border border-gray-200 bg-white flex items-center justify-center text-gray-800 py-4 rounded-full text-sm font-bold hover:bg-gray-50 transition-all active:scale-95 font-lato"
               >
                 <Icon name={google} size={18} className="mr-3" />
                 {mode === "register" ? "Sign up with Google" : "Sign in with Google"}
@@ -200,7 +210,7 @@ export default function AuthScreen({
             </div>
 
             <div className="text-center pt-6 pb-2">
-              <p className="text-[12px] text-gray-500">
+              <p className="text-[12px] text-gray-500 font-lato">
                 {mode === "register" ? "Already have an account? " : "Don't have an account? "}
                 <button 
                   type="button" 

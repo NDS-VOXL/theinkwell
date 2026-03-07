@@ -1,5 +1,16 @@
 "use client";
-import { useProfile } from "@/app/profile/profileContent"; 
+
+import { useProfile } from "@/app/profile/profileContent";
+import { auth, db } from "@/app/firebase";
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc, 
+  updateDoc,
+  orderBy 
+} from "firebase/firestore";
 import {
   Bookmark,
   BookOpen,
@@ -12,18 +23,16 @@ import {
   TrendingUp,
   Users,
   X,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react";
 import Image from "next/image";
-import { useRef, useState } from "react";
-
-// 🟢 1. Import your Placeholder Component!
+import { useRef, useState, useEffect } from "react";
 import ArticleCard from "@/app/components/ArticleCard";
+import { Article } from "@/app/types";
 
-// ─── Mock Data ───────────────────────────────────────────────────────────────
 const highlights = [
   { icon: TrendingUp, text: <>Your articles engagements went up by <strong>2%</strong> yesterday</> },
-  { icon: Users, text: <>Your profile gained <strong>14</strong> new followers</> },
   { icon: Users, text: <>Your profile gained <strong>14</strong> new followers</> },
   { icon: Share2, text: <>Your post where shared by <strong style={{ color: "#00897B" }}>62</strong> new people</> },
 ];
@@ -36,358 +45,261 @@ const quickActions = [
   { label: "My Articles", icon: BookOpen },
 ];
 
-const categories = ["Health & Lifestyle", "Sports", "Entertainment"];
-
-// ─── Component ───────────────────────────────────────────────────────────────
 export default function ProfilePage() {
-  const [links, setLinks] = useState<{ platform: string; url: string }[]>([]);
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
-
-  // Global State & Refs
   const { user, updateUser } = useProfile();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Bio Modal States
+  // States for dynamic data
+  const [myArticles, setMyArticles] = useState<Article[]>([]);
+  const [followingList, setFollowingList] = useState<string[]>([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [tempName, setTempName] = useState(user.name);
-  const [tempBio, setTempBio] = useState(user.bio);
+  const [tempName, setTempName] = useState("");
+  const [tempBio, setTempBio] = useState("");
+  const [links, setLinks] = useState<{ platform: string; url: string }[]>([]);
 
-  // Link Modal States
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [tempPlatform, setTempPlatform] = useState("");
-  const [tempUrl, setTempUrl] = useState("");
+  const firstInitial = user.name ? user.name.charAt(0).toUpperCase() : "?";
 
-  // ─── Logic Handlers ───
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ─── 🟢 FETCH USER ACTIVITIES ───
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    // 1. Fetch current user data (Following list AND Followers count)
+    const userRef = doc(db, "users", currentUser.uid);
+    const unsubUser = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setFollowingList(data.following || []);
+        setFollowersCount(data.followersCount || 0);
+      }
+    });
+
+    // 2. Fetch only articles written by THIS user
+    const q = query(
+      collection(db, "articles"), 
+      where("authorId", "==", currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubArticles = onSnapshot(q, (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Article));
+      setMyArticles(docs);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubUser();
+      unsubArticles();
+    };
+  }, []);
+
+  // ─── 🟢 AI FIX: AVATAR AND BIO UPLOAD HANDLERS ───
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      updateUser({ avatar: url });
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      updateUser({ avatar: base64 }); // update local state
+
+      // ✅ Also persist to Firestore so ArticleCard can read it
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const userRef = doc(db, "users", currentUser.uid);
+          await updateDoc(userRef, { avatar: base64 });
+        } catch (err) {
+          console.error("Avatar save error:", err);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleSaveBio = () => {
+  const handleSaveBio = async () => {
     updateUser({ name: tempName, bio: tempBio });
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const userRef = doc(db, "users", currentUser.uid);
+        await updateDoc(userRef, { 
+          name: tempName, 
+          bio: tempBio,
+          avatar: user.avatar  // ✅ ensure the image isn't lost during a name change
+        });
+      } catch (err) {
+        console.error("Firestore Update Error:", err);
+      }
+    }
     setIsModalOpen(false);
   };
 
-  const handleOpenAddLink = () => {
-    setEditingIdx(null);
-    setTempPlatform("");
-    setTempUrl("");
-    setIsLinkModalOpen(true);
-  };
-
-  const handleOpenEditLink = (index: number) => {
-    setEditingIdx(index);
-    setTempPlatform(links[index].platform);
-    setTempUrl(links[index].url);
-    setIsLinkModalOpen(true);
-  };
-
-  const handleSaveLink = () => {
-    if (!tempPlatform.trim() || !tempUrl.trim()) return;
-
-    if (editingIdx !== null) {
-      const newLinks = [...links];
-      newLinks[editingIdx] = { platform: tempPlatform, url: tempUrl };
-      setLinks(newLinks);
-    } else {
-      setLinks([...links, { platform: tempPlatform, url: tempUrl }]);
-    }
-    setIsLinkModalOpen(false);
-  };
-
-  const handleDeleteLinkDirect = (index: number) => {
-    const newLinks = links.filter((_, i) => i !== index);
-    setLinks(newLinks);
-  };
-
   return (
-    <div style={{ paddingBottom: 60 }}>
-      <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet" />
+    <div style={{ paddingBottom: 60 }} className="font-lato">
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
 
-      {/* Hidden File Input */}
-      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" style={{ display: "none" }} />
+      <p className="font-bold text-[15px] text-gray-900 mb-5 uppercase tracking-widest">Profile Dashboard</p>
 
-      <p style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", marginBottom: 20 }}>Your Profile</p>
-
-      {/* ── Top Row ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 40, marginBottom: 16 }}>
-        
-        {/* Profile Card */}
-        <div>
-          <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginBottom: 18 }}>
-            {/* Avatar */}
-            <div style={{ position: "relative", flexShrink: 0 }}>
-              <div style={{ width: 92, height: 92, borderRadius: 18, overflow: "hidden", background: "linear-gradient(145deg, #d4a843 0%, #5a9e6f 50%, #2d6e8a 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Image src={user.avatar} alt="User Profile" width={92} height={92} className="object-cover w-full h-full" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-4">
+        {/* Profile Details */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+          <div className="flex gap-5 items-start mb-5">
+            <div className="relative shrink-0">
+              <div className="w-[92px] h-[92px] rounded-[18px] overflow-hidden bg-gray-200 flex items-center justify-center border-2 border-[#00897B]">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-4xl font-black text-[#00897B]">{firstInitial}</span>
+                )}
               </div>
-
-              <div onClick={() => fileInputRef.current?.click()} style={{ position: "absolute", bottom: -5, right: -5, width: 26, height: 26, background: "#00897B", borderRadius: "50%", border: "2px solid #F5F3EE", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+              <div onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-7 h-7 bg-[#00897B] rounded-full border-2 border-white flex items-center justify-center cursor-pointer shadow-md">
+                <Plus size={14} color="#fff" />
               </div>
             </div>
 
-            <div style={{ paddingTop: 6 }}>
-              <p style={{ fontWeight: 900, fontSize: 20, color: "#111", marginBottom: 3 }}>{user.name}</p>
-              <p style={{ fontWeight: 300, fontSize: 12, color: "#777", marginBottom: 14 }}>{user.bio}</p>
-
-              <button
-                onClick={() => {
-                  setTempName(user.name);
-                  setTempBio(user.bio);
-                  setIsModalOpen(true);
-                }}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 22px", borderRadius: 30, border: "1.5px solid #bbb", background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", color: "#222" }}
+            <div className="pt-1">
+              <p className="font-black text-xl text-gray-900 leading-tight">{user.name}</p>
+              <p className="text-sm text-gray-400 mb-3 font-bold">{auth.currentUser?.email}</p>
+              <button 
+                onClick={() => { setTempName(user.name); setTempBio(user.bio); setIsModalOpen(true); }}
+                className="flex items-center gap-2 px-5 py-2 rounded-full border border-gray-100 bg-white text-[10px] font-black uppercase tracking-wide hover:bg-gray-50 transition-all shadow-sm"
               >
-                Edit bio <Pencil size={12} />
+                Update Bio <Pencil size={12} />
               </button>
             </div>
           </div>
-
-          {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "left", paddingTop: 14, marginBottom: 16 }}>
-            {[["50", "Following"], ["4.7k", "Followers"], ["3k", "New Profile Views"], ["671k", "Likes"]].map(([val, lbl]) => (
-              <div key={lbl}>
-                <p style={{ fontWeight: 900, fontSize: 14, color: "#111", marginBottom: 2 }}>{val}</p>
-                <p style={{ fontWeight: 400, fontSize: 9, color: "#999", lineHeight: 1.3 }}>{lbl}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Categories */}
-          <div style={{ background: "#fff", borderRadius: 14, padding: "12px 14px", border: "1px solid #e2dcd2" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <p style={{ fontWeight: 700, fontSize: 12, color: "#333" }}>Your Categories</p>
-              <Pencil size={11} color="#aaa" style={{ cursor: "pointer" }} />
+          
+          <div className="grid grid-cols-4 pt-4 border-t border-gray-50 text-center">
+            <div>
+              <p className="font-black text-sm text-gray-900">{followingList.length}</p>
+              <p className="text-[8px] text-gray-400 uppercase font-black">Following</p>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {categories.map((c) => (
-                <span key={c} style={{ background: "#00897B", color: "#fff", fontSize: 11, fontWeight: 700, padding: "6px 8px", borderRadius: 20 }}>{c}</span>
-              ))}
+            <div>
+              <p className="font-black text-sm text-gray-900">{followersCount}</p>
+              <p className="text-[8px] text-gray-400 uppercase font-black">Followers</p>
+            </div>
+            <div>
+              <p className="font-black text-sm text-gray-900">0</p>
+              <p className="text-[8px] text-gray-400 uppercase font-black">Views</p>
+            </div>
+            <div>
+              <p className="font-black text-sm text-gray-900">0</p>
+              <p className="text-[8px] text-gray-400 uppercase font-black">Likes</p>
             </div>
           </div>
         </div>
 
-        {/* Public Links Card */}
-        <div style={{ ...card, background: "#FFFF", alignItems: "center", justifyItems: "center" }}>
-          <p style={{ fontWeight: 900, fontSize: 14, color: "#111", marginBottom: 14 }}>Public Links</p>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", alignItems: "center" }}>
-            {links.length === 0 ? (
-              <p style={{ fontSize: 11, color: "#999", fontStyle: "italic", textAlign: "center", width: "100%" }}>
-                No links added yet.
-              </p>
-            ) : (
-              links.map((l, i) => (
-                <div key={i} style={{ width: "100%", padding: "8px", border: "1px solid #f0f0f0", borderRadius: "10px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <p style={{ fontWeight: 700, fontSize: 12, color: "#333" }}>{l.platform}</p>
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <Pencil size={12} color="#888" style={{ cursor: "pointer" }} onClick={() => handleOpenEditLink(i)} />
-                      <Trash2 size={12} color="#ef4444" style={{ cursor: "pointer" }} onClick={() => handleDeleteLinkDirect(i)} />
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 10, color: "#00897B", fontWeight: 400, wordBreak: "break-all" }}>{l.url}</p>
-                </div>
-              ))
-            )}
-          </div>
-
-          <button
-            onClick={handleOpenAddLink}
-            style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 6, padding: "7px 18px", borderRadius: 20, border: "1px solid #ccc", background: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", color: "#333" }}
-          >
-            Add link <Plus size={12} />
+        {/* Public Links */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col items-center justify-center gap-4">
+          <p className="font-black text-[10px] text-gray-400 uppercase tracking-widest">Public Links</p>
+          <button className="px-6 py-3 rounded-full border-2 border-dashed border-gray-200 text-[10px] font-black text-gray-400 hover:border-[#00897B] hover:text-[#00897B] transition-all">
+            Add Link +
           </button>
         </div>
 
         {/* Quick Actions */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-end" }}>
+        <div className="flex flex-col gap-3">
           {quickActions.map(({ label, icon: Icon }) => (
-            <button key={label} style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 20px", borderRadius: 30, border: "1px solid #d8d4cc", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#444", whiteSpace: "nowrap", width: "fit-content" }}>
-              {label} <Icon size={14} color="#aaa" strokeWidth={1.5} />
+            <button key={label} className="flex items-center justify-between px-6 py-4 rounded-full border border-gray-50 text-[10px] font-black uppercase bg-white hover:bg-teal-50 hover:border-[#00897B] transition-all group">
+              {label} <Icon size={14} className="text-gray-300 group-hover:text-[#00897B]" />
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── Highlights ── */}
-      <div>
-        <p style={{ fontWeight: 700, fontSize: 14, color: "#111", marginBottom: 12 }}>Your Highlights</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+      {/* Highlights */}
+      <div className="mt-12">
+        <p className="font-black text-[10px] text-gray-400 uppercase mb-4 tracking-widest">Performance Highlights</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {highlights.map(({ icon: Icon, text }, i) => (
-            <div key={i} style={{ ...card, display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#00897B", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Icon size={16} color="#fff" />
+            <div key={i} className="flex items-start gap-4 p-5 bg-white rounded-[24px] border border-gray-50 shadow-sm">
+              <div className="w-10 h-10 bg-[#00897B] rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-teal-900/10">
+                <Icon size={18} color="#fff" />
               </div>
-              <p style={{ fontSize: 11, color: "#444", fontWeight: 400, lineHeight: 1.5 }}>{text}</p>
+              <p className="text-[11px] text-gray-600 leading-relaxed pt-1">{text}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 🟢 ── NEW: Dashed Divider ── */}
-      <div style={{ width: "100%", borderTop: "2px dashed #e0e0e0", margin: "40px 0" }}></div>
+      <div className="w-full border-t border-dashed border-gray-200 my-12" />
 
-      {/* 🟢 ── NEW: Bottom Layout (Activities & Sidebar) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 40 }}>
+      {/* ─── 🟢 ACTIVITIES GRID ─── */}
+      <div className="max-w-3xl">
+        <h3 className="text-2xl font-black text-gray-900 mb-1">Your Inkwell</h3>
+        <p className="text-xs font-bold text-[#00897B] uppercase mb-10">Stories Published by You</p>
         
-        {/* Left: Your Activities */}
-        <div>
-          <h3 style={{ fontWeight: 900, fontSize: 20, color: "#111", margin: "0 0 4px 0" }}>Your Activities</h3>
-          <p style={{ fontSize: 12, color: "#888", margin: "0 0 24px 0" }}>Shared by you.</p>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Using the ArticleCard component placeholder! */}
-            <ArticleCard />
-            <ArticleCard />
-          </div>
-        </div>
-
-        {/* Right: Sidebar Content */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-          
-          {/* Widget: Suggested Writers */}
-          <div>
-            <h3 style={{ fontWeight: 900, fontSize: 16, color: "#111", margin: "0 0 4px 0" }}>Suggested Writers</h3>
-            <p style={{ fontSize: 10, color: "#888", margin: "0 0 16px 0", textTransform: "uppercase", fontWeight: 700 }}>Based on your profile</p>
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { name: 'Tetharus Honet', tags: 'Artist | Educational | Health...' },
-                { name: 'Loveren Paul', tags: 'Artist | Educational | Health...' },
-                { name: 'Cassandra Peter', tags: 'Artist | Educational | Health...' }
-              ].map((writer, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#FDFBF7", borderRadius: 16, border: "1px solid #f0f0f0", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e0e0e0", overflow: "hidden" }}>
-                       <Image src={user.avatar} alt={writer.name} width={40} height={40} style={{ objectFit: "cover" }} />
-                    </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#111" }}>{writer.name}</p>
-                      <p style={{ margin: 0, fontSize: 9, color: "#888" }}>{writer.tags}</p>
-                    </div>
-                  </div>
-                  <button style={{ padding: "6px 14px", background: "#00897B", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 20, border: "none", cursor: "pointer" }}>Follow +</button>
-                </div>
-              ))}
+        <div className="space-y-4">
+          {loading ? (
+            <div className="flex flex-col items-center py-20 text-gray-200">
+              <Loader2 className="animate-spin mb-4" size={32} />
+              <p className="font-black text-[10px] uppercase tracking-widest">Opening your feed...</p>
             </div>
-            <button style={{ width: "100%", marginTop: 16, padding: "12px", background: "#111", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 30, border: "none", cursor: "pointer" }}>
-              See More... →
-            </button>
-          </div>
-
-          <div style={{ width: "100%", borderTop: "2px dashed #e0e0e0" }}></div>
-
-          {/* Widget: Community Chats (Dark Theme) */}
-          <div style={{ background: "#1a1a1a", padding: 24, borderRadius: 24, boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
-            <h3 style={{ margin: "0 0 20px 0", fontSize: 12, fontWeight: 700, color: "#888", textAlign: "center", textTransform: "uppercase" }}>Community chats</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {['Ha Ppiness Ifeoma', 'Itz Bless Chinonso', 'Aai Sha', 'Unique Precious', 'Real Suxcy'].map((name, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(45deg, #f59e0b, #ef4444)", padding: 2 }}>
-                    <div style={{ width: "100%", height: "100%", background: "#1a1a1a", borderRadius: "50%", overflow: "hidden" }}>
-                       <Image src="/user-avatar.jpg" alt={name} width={32} height={32} style={{ objectFit: "cover" }} />
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#ddd" }}>{name}</span>
-                </div>
-              ))}
+          ) : myArticles.length > 0 ? (
+            myArticles.map((article) => (
+              <ArticleCard 
+                key={article.id} 
+                article={article} 
+                currentUserFollowing={followingList} 
+                isOwner={true}
+              />
+            ))
+          ) : (
+            <div className="p-20 border-2 border-dashed border-gray-100 rounded-[40px] text-center bg-white shadow-sm">
+              <BookOpen size={40} className="mx-auto text-gray-100 mb-4" />
+              <p className="text-gray-400 font-bold text-sm">Your stories will appear here. Start writing!</p>
             </div>
-          </div>
-
-          {/* Widget: New Followers */}
-          <div>
-            <h3 style={{ fontWeight: 900, fontSize: 16, color: "#111", margin: "0 0 16px 0" }}>New Followers</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { name: 'Paulina Hutchinson', tags: 'Artist | Educational | Health...' },
-                { name: 'Hester Titian', tags: 'Artist | Educational | Health...' },
-                { name: 'Jackie Chan Z', tags: 'Artist | Educational | Health...' }
-              ].map((follower, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#FDFBF7", borderRadius: 16, border: "1px solid #f0f0f0" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e0e0e0", overflow: "hidden" }}>
-                       <Image src={user.avatar} alt={follower.name} width={40} height={40} style={{ objectFit: "cover" }} />
-                    </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#111" }}>{follower.name}</p>
-                      <p style={{ margin: 0, fontSize: 9, color: "#888" }}>{follower.tags}</p>
-                    </div>
-                  </div>
-                  <button style={{ padding: "6px 14px", background: "#00897B", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 20, border: "none", cursor: "pointer" }}>Follow +</button>
-                </div>
-              ))}
-            </div>
-            <button style={{ width: "100%", marginTop: 16, padding: "12px", background: "#111", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 30, border: "none", cursor: "pointer" }}>
-              See More... →
-            </button>
-          </div>
-
+          )}
         </div>
       </div>
 
-      {/* ── MODALS (Bio & Links) REMAIN UNCHANGED BELOW ── */}
-      
-      {/* ── EDIT BIO MODAL ── */}
+      {/* Edit Modal */}
       {isModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(2px)" }}>
-          <div style={{ backgroundColor: "#FDFBF7", padding: 32, borderRadius: 24, width: "100%", maxWidth: 400, boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#111" }}>Edit Profile</h3>
-              <X size={20} color="#888" style={{ cursor: "pointer" }} onClick={() => setIsModalOpen(false)} />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-[100] animate-in fade-in duration-200">
+          <div className="bg-[#FDFBF7] p-8 rounded-[40px] w-full max-w-md shadow-2xl border-4 border-white animate-in zoom-in-95 duration-300">
+            <div className="flex justify-end mb-4">
+              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
+                <X size={20} className="text-gray-900" />
+              </button>
             </div>
+            
+            <div className="space-y-6">
+               <div className="text-center">
+                 <h2 className="text-2xl font-black text-gray-900">Edit Profile</h2>
+                 <p className="text-xs font-bold text-gray-400 uppercase mt-1">Keep your info up to date</p>
+               </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 6 }}>Full Name</label>
-              <input value={tempName} onChange={(e) => setTempName(e.target.value)} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1px solid #ddd", outline: "none", fontSize: 14, boxSizing: "border-box" }} />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-4">Full Name</label>
+                <input 
+                  value={tempName} 
+                  onChange={(e) => setTempName(e.target.value)} 
+                  className="w-full p-5 rounded-[24px] border border-gray-100 outline-none focus:border-[#00897B] text-sm font-bold bg-white shadow-inner" 
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-4">About You</label>
+                <textarea 
+                  value={tempBio} 
+                  onChange={(e) => setTempBio(e.target.value)} 
+                  className="w-full p-5 rounded-[24px] border border-gray-100 outline-none focus:border-[#00897B] text-sm font-bold bg-white h-32 resize-none shadow-inner" 
+                />
+              </div>
+              
+              <button 
+                onClick={handleSaveBio} 
+                className="w-full py-5 bg-[#00897B] text-white font-black rounded-full shadow-xl hover:bg-teal-800 transition-all uppercase tracking-widest text-xs"
+              >
+                Save Changes
+              </button>
             </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 6 }}>Your Bio</label>
-              <textarea value={tempBio} onChange={(e) => setTempBio(e.target.value)} rows={3} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1px solid #ddd", outline: "none", fontSize: 14, resize: "none", boxSizing: "border-box" }} />
-            </div>
-
-            <button onClick={handleSaveBio} style={{ width: "100%", padding: 16, backgroundColor: "#00897B", color: "#fff", borderRadius: 30, border: "none", fontWeight: 900, cursor: "pointer", fontSize: 14 }}>Save Changes</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── ADD / EDIT LINK MODAL ── */}
-      {isLinkModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 110, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(2px)" }}>
-          <div style={{ backgroundColor: "#FDFBF7", padding: 32, borderRadius: 24, width: "100%", maxWidth: 400, boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#111" }}>
-                {editingIdx !== null ? "Edit Link" : "Add New Link"}
-              </h3>
-              <X size={20} color="#888" style={{ cursor: "pointer" }} onClick={() => setIsLinkModalOpen(false)} />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 6 }}>Platform Name</label>
-              <input value={tempPlatform} onChange={(e) => setTempPlatform(e.target.value)} placeholder="e.g. LinkedIn" style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1px solid #ddd", outline: "none", fontSize: 14, boxSizing: "border-box" }} />
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", marginBottom: 6 }}>URL</label>
-              <input value={tempUrl} onChange={(e) => setTempUrl(e.target.value)} placeholder="https://" style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1px solid #ddd", outline: "none", fontSize: 14, boxSizing: "border-box" }} />
-            </div>
-
-            <button onClick={handleSaveLink} style={{ width: "100%", padding: 16, backgroundColor: "#00897B", color: "#fff", borderRadius: 30, border: "none", fontWeight: 900, cursor: "pointer", fontSize: 14 }}>
-              {editingIdx !== null ? "Update Link" : "Add Link"}
-            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-const card: React.CSSProperties = {
-  borderRadius: 16,
-  padding: "18px 20px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-};
